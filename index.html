@@ -1,0 +1,2464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Wavelength — Voice &amp; Video Calling</title>
+<meta name="theme-color" content="#0a0a0f" />
+<meta name="description" content="Premium voice and video calling, powered by Firebase and WebRTC." />
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16.png" />
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Wavelength" />
+<meta name="mobile-web-app-capable" content="yes" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   WAVELENGTH — design tokens
+   Base:   #0A0A0F (void)      Surface: rgba(255,255,255,.045)
+   Accent: #7C5CFC (signal violet)   Accent2: #22D6B8 (online teal)
+   Danger: #FF5470     Warn: #FFB454
+   Type:   Space Grotesk (display) / Inter (body)
+   ========================================================= */
+
+* { box-sizing: border-box; }
+img, video, svg { max-width: 100%; }
+#app-shell, .main-col, .views, .view { max-width: 100vw; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:root {
+  --void: #0a0a0f;
+  --void-2: #101017;
+  --surface: rgba(255,255,255,.045);
+  --surface-hi: rgba(255,255,255,.08);
+  --border: rgba(255,255,255,.09);
+  --border-soft: rgba(255,255,255,.06);
+  --ink: #f2f2f7;
+  --ink-dim: #9a9aab;
+  --ink-faint: #67677a;
+  --accent: #7c5cfc;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(124,92,252,.16);
+  --accent-2: #22d6b8;
+  --accent-2-soft: rgba(34,214,184,.16);
+  --danger: #ff5470;
+  --danger-soft: rgba(255,84,112,.16);
+  --warn: #ffb454;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --radius-lg: 26px;
+  --radius-md: 16px;
+  --radius-sm: 11px;
+  --shadow-float: 0 20px 60px rgba(0,0,0,.45);
+  --topbar-h: 64px;
+  --bottomnav-h: 76px;
+  --sidebar-w: 84px;
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+
+body.light {
+  --void: #f3f2f9;
+  --void-2: #ffffff;
+  --surface: rgba(20,16,40,.035);
+  --surface-hi: rgba(20,16,40,.06);
+  --border: rgba(20,16,40,.09);
+  --border-soft: rgba(20,16,40,.06);
+  --ink: #17151f;
+  --ink-dim: #605c72;
+  --ink-faint: #9793a8;
+}
+
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; margin: 0; letter-spacing: -.01em; }
+p { margin: 0; }
+button { font-family: inherit; }
+input { font-family: inherit; }
+.hidden { display: none !important; }
+a { color: inherit; }
+
+/* ---------------- Splash ---------------- */
+#splash {
+  position: fixed; inset: 0; z-index: 999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; background: var(--void); color: var(--ink);
+}
+.splash-mark {
+  position: relative; width: 56px; height: 56px; border-radius: 18px;
+  background: linear-gradient(155deg, var(--accent), #4f36c9);
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.splash-ring {
+  position: absolute; inset: -8px; border-radius: 22px; border: 1.5px solid var(--accent-soft);
+  animation: splash-pulse 1.6s var(--ease) infinite;
+}
+@keyframes splash-pulse { 0%{ transform:scale(.9); opacity:1; } 100%{ transform:scale(1.35); opacity:0; } }
+#splash p { font-family: var(--font-display); font-size: 14px; color: var(--ink-dim); letter-spacing: .02em; }
+
+/* ---------------- Toasts ---------------- */
+#toast-container {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; display: flex; flex-direction: column; gap: 8px; width: min(92vw, 380px);
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  background: rgba(24,22,34,.92);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  box-shadow: var(--shadow-float);
+  display: flex; align-items: center; gap: 10px;
+  animation: toast-in .35s var(--ease);
+}
+.toast.error { border-color: rgba(255,84,112,.4); }
+.toast.success { border-color: rgba(34,214,184,.4); }
+@keyframes toast-in { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform:none; } }
+.toast-fade { animation: toast-out .3s var(--ease) forwards; }
+@keyframes toast-out { to { opacity:0; transform: translateY(-8px); } }
+
+/* ---------------- Screens ---------------- */
+.screen { min-height: 100dvh; width: 100%; }
+#auth-screen { height: 100dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------------- Auth ---------------- */
+#auth-screen {
+  display: flex; align-items: center; justify-content: center;
+  padding: 28px 20px 48px;
+  background:
+    radial-gradient(720px 420px at 15% -10%, rgba(124,92,252,.25), transparent 60%),
+    radial-gradient(600px 400px at 100% 100%, rgba(34,214,184,.12), transparent 55%),
+    var(--void);
+}
+.auth-wrap { width: 100%; max-width: 380px; }
+.auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 40px; justify-content: center; }
+.brand-mark {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(155deg, var(--accent), #4f36c9);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+}
+.auth-brand span { font-family: var(--font-display); font-weight: 600; font-size: 17px; letter-spacing: -.01em; }
+
+.auth-form h1 { font-size: 26px; margin-bottom: 6px; }
+.auth-sub { color: var(--ink-dim); font-size: 14px; margin-bottom: 26px; }
+.field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; }
+.field span { font-size: 12.5px; color: var(--ink-dim); font-weight: 500; }
+.field input {
+  background: var(--surface); border: 1px solid var(--border); color: var(--ink);
+  padding: 13px 14px; border-radius: var(--radius-sm); font-size: 14.5px; outline: none;
+  transition: border-color .18s var(--ease), background .18s var(--ease);
+}
+.field input:focus { border-color: var(--accent); background: var(--surface-hi); }
+.field input::placeholder { color: var(--ink-faint); }
+
+.link-btn {
+  background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 500;
+  cursor: pointer; padding: 0; margin-bottom: 18px; display: inline-block;
+}
+.link-btn:hover { text-decoration: underline; }
+.auth-switch { text-align: center; margin-top: 20px; font-size: 13.5px; color: var(--ink-dim); }
+.auth-switch .link-btn { margin: 0 0 0 4px; }
+
+.avatar-picker {
+  position: relative; width: 78px; height: 78px; border-radius: 50%; margin: 0 auto 24px;
+  display: block; cursor: pointer; background: var(--surface); border: 1px dashed var(--border);
+  overflow: hidden;
+}
+.avatar-picker img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-picker-icon {
+  position: absolute; bottom: -2px; right: -2px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--void);
+}
+
+/* ---------------- Buttons ---------------- */
+.btn {
+  border: none; border-radius: var(--radius-sm); padding: 13px 20px; font-size: 14.5px;
+  font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; transition: transform .15s var(--ease), background .18s var(--ease), opacity .15s;
+  position: relative;
+}
+.btn:active { transform: scale(.97); }
+.btn-block { width: 100%; }
+.btn-primary { background: linear-gradient(155deg, var(--accent), #6644e0); color: #fff; }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--surface-hi); }
+.btn-light { background: #fff; color: #14121c; }
+.btn-light:hover { filter: brightness(.96); }
+.btn[disabled] { opacity: .65; pointer-events: none; }
+.btn-spinner {
+  display: none; width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; animation: spin .7s linear infinite;
+}
+.btn.loading .btn-label { visibility: hidden; }
+.btn.loading .btn-spinner { display: block; position: absolute; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.text-btn { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* ---------------- App shell layout ---------------- */
+#app-shell { display: flex; height: 100dvh; overflow: hidden; }
+
+.sidebar {
+  display: none;
+  width: var(--sidebar-w); flex-shrink: 0; flex-direction: column; align-items: center;
+  gap: 6px; padding: 22px 0; background: var(--void-2); border-right: 1px solid var(--border-soft);
+  position: sticky; top: 0; height: 100dvh;
+}
+.sidebar-brand { margin-bottom: 22px; }
+.nav-item {
+  width: 60px; padding: 10px 4px; border-radius: 14px; background: none; border: none;
+  color: var(--ink-faint); display: flex; flex-direction: column; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 500; cursor: pointer; transition: color .15s, background .15s;
+}
+.nav-item:hover { color: var(--ink-dim); background: var(--surface); }
+.nav-item.active { color: var(--accent); background: var(--accent-soft); }
+.nav-logout { margin-top: auto; color: var(--ink-faint); }
+.nav-logout:hover { color: var(--danger); background: var(--danger-soft); }
+.nav-avatar {
+  width: 22px; height: 22px; border-radius: 50%; background-size: cover; background-position: center;
+  background-color: var(--surface-hi); border: 1.5px solid var(--border);
+}
+
+.main-col { flex: 1; min-width: 0; height: 100dvh; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+
+.topbar {
+  height: var(--topbar-h); flex-shrink: 0; display: flex; align-items: center; gap: 14px;
+  padding: 0 18px; border-bottom: 1px solid var(--border-soft);
+  background: rgba(10,10,15,.7); backdrop-filter: blur(16px);
+  position: sticky; top: 0; z-index: 40;
+}
+body.light .topbar { background: rgba(243,242,249,.75); }
+.topbar-title { font-family: var(--font-display); font-weight: 600; font-size: 18px; display: none; }
+.topbar-search {
+  flex: 1; display: flex; align-items: center; gap: 9px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px; padding: 9px 13px; color: var(--ink-faint);
+}
+.topbar-search input {
+  border: none; background: none; outline: none; color: var(--ink); font-size: 14px; flex: 1;
+}
+.topbar-search input::placeholder { color: var(--ink-faint); }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.net-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; transition: background .3s; }
+.net-dot.online { background: var(--accent-2); box-shadow: 0 0 8px rgba(34,214,184,.6); }
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 11px; background: var(--surface); border: 1px solid var(--border);
+  color: var(--ink-dim); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  position: relative; flex-shrink: 0; transition: background .15s;
+}
+.icon-btn:hover { background: var(--surface-hi); color: var(--ink); }
+.new-call-fab { color: var(--accent); border-color: var(--accent-soft); }
+.badge-dot { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+.topbar-avatar {
+  width: 38px; height: 38px; border-radius: 50%; background-size: cover; background-position: center;
+  background-color: var(--surface-hi); border: 1.5px solid var(--border); cursor: pointer; padding: 0;
+  flex-shrink: 0;
+}
+
+.notif-panel, .search-panel {
+  position: absolute; top: calc(var(--topbar-h) + 8px); right: 18px; width: min(360px, 92vw);
+  background: rgba(20,18,30,.96); backdrop-filter: blur(20px); border: 1px solid var(--border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-float); z-index: 50; overflow: hidden;
+  max-height: 70vh; overflow-y: auto;
+}
+body.light .notif-panel, body.light .search-panel { background: rgba(255,255,255,.98); }
+.search-panel { left: 18px; right: 18px; top: calc(var(--topbar-h) + 8px); }
+.notif-panel-head { padding: 14px 16px; font-weight: 600; font-size: 13.5px; border-bottom: 1px solid var(--border-soft); }
+.notif-list { padding: 6px; }
+.notif-row { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; }
+.notif-row:hover { background: var(--surface); }
+
+/* ---------------- Views ---------------- */
+.views {
+  flex: 1; min-height: 0; width: 100%; max-width: 880px; margin: 0 auto;
+  padding: 18px 18px calc(var(--bottomnav-h) + 24px);
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.views::-webkit-scrollbar { display: none; }
+.view { display: none; animation: view-in .3s var(--ease); }
+.view.active { display: block; }
+@keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+
+.hero-card {
+  background: linear-gradient(135deg, #6644e0 0%, #7c5cfc 55%, #3b2aa8 100%);
+  border-radius: var(--radius-lg); padding: 28px 24px; margin-bottom: 26px; color: #fff;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+  position: relative; overflow: hidden;
+}
+.hero-card::before {
+  content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.18), transparent 70%);
+  top: -100px; right: -60px;
+}
+.eyebrow-free { font-size: 12px; font-weight: 600; opacity: .85; }
+.hero-copy h2 { font-size: 24px; margin: 6px 0 8px; max-width: 260px; }
+.hero-copy p { font-size: 13.5px; opacity: .85; max-width: 320px; line-height: 1.45; }
+
+.section-row { display: flex; align-items: center; justify-content: space-between; margin: 26px 0 12px; }
+.section-row h3 { font-size: 15px; color: var(--ink-dim); font-weight: 600; }
+
+.online-strip { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+.online-strip::-webkit-scrollbar { display: none; }
+.online-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; width: 62px; cursor: pointer; }
+.online-avatar-wrap { position: relative; width: 54px; height: 54px; }
+.online-avatar {
+  width: 54px; height: 54px; border-radius: 50%; background-size: cover; background-position: center;
+  background-color: var(--surface-hi); border: 2px solid var(--accent-2);
+}
+.online-item span.oname { font-size: 11px; color: var(--ink-dim); max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.list { display: flex; flex-direction: column; gap: 8px; }
+.row-card {
+  display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-md);
+  background: var(--surface); border: 1px solid var(--border-soft); cursor: pointer;
+  transition: background .15s;
+}
+.row-card:hover { background: var(--surface-hi); }
+.row-avatar-wrap { position: relative; flex-shrink: 0; }
+.row-avatar {
+  width: 46px; height: 46px; border-radius: 50%; background-size: cover; background-position: center;
+  background-color: var(--surface-hi); border: 1.5px solid var(--border);
+}
+.presence-dot {
+  position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border-radius: 50%;
+  border: 2.5px solid var(--void-2); background: var(--ink-faint);
+}
+.presence-dot.online { background: var(--accent-2); }
+.presence-dot.oncall { background: var(--warn); }
+.row-body { flex: 1; min-width: 0; }
+.row-body .rname { font-size: 14.5px; font-weight: 600; }
+.row-body .rmeta { font-size: 12.5px; color: var(--ink-dim); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+.row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.row-icon-btn {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+  color: var(--ink-dim); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.row-icon-btn:hover { color: var(--accent); border-color: var(--accent-soft); background: var(--accent-soft); }
+.row-icon-btn.fav.active { color: var(--warn); border-color: rgba(255,180,84,.4); }
+
+.call-type-icon { display: inline-flex; align-items: center; }
+.call-type-icon.missed { color: var(--danger); }
+.call-type-icon.incoming { color: var(--accent-2); }
+.call-type-icon.outgoing { color: var(--ink-dim); }
+
+.empty-note { color: var(--ink-faint); font-size: 13.5px; padding: 18px 4px; text-align: center; }
+
+.filter-row { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 16px; scrollbar-width: none; }
+.filter-row::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink-dim); font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ---------------- Profile view ---------------- */
+.profile-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 20px 0 10px; }
+.profile-photo-wrap { position: relative; width: 96px; height: 96px; margin-bottom: 16px; }
+.profile-photo-wrap img {
+  width: 96px; height: 96px; border-radius: 50%; object-fit: cover; background: var(--surface-hi);
+  border: 2px solid var(--border);
+}
+.profile-photo-wrap .presence-dot { width: 16px; height: 16px; border-width: 3px; }
+#profile-name { font-size: 22px; }
+.profile-username { color: var(--ink-dim); font-size: 14px; margin-top: 3px; }
+.profile-status { color: var(--accent-2); font-size: 12.5px; font-weight: 600; margin-top: 8px; }
+.profile-about { color: var(--ink-dim); font-size: 13.5px; margin-top: 10px; max-width: 320px; line-height: 1.5; }
+.profile-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; justify-content: center; }
+
+.edit-form { max-width: 380px; margin: 10px auto 0; }
+.edit-actions { display: flex; gap: 10px; margin-top: 8px; }
+.edit-actions .btn { flex: 1; }
+
+/* ---------------- Settings ---------------- */
+.settings-group { margin-bottom: 26px; }
+.settings-group h4 { font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; padding: 0 4px; }
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between; padding: 14px 14px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  margin-bottom: 6px; font-size: 14px; color: var(--ink); cursor: pointer; width: 100%; border: none;
+  border: 1px solid var(--border-soft);
+}
+button.settings-row { text-align: left; }
+.settings-row svg { color: var(--ink-faint); }
+.toggle { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-slider {
+  position: absolute; inset: 0; background: var(--border); border-radius: 999px; cursor: pointer;
+  transition: background .2s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%;
+  background: #fff; transition: transform .2s var(--ease);
+}
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+/* ---------------- Bottom nav (mobile) ---------------- */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; height: var(--bottomnav-h); z-index: 40;
+  display: flex; align-items: center; justify-content: space-around;
+  background: rgba(14,13,20,.85); backdrop-filter: blur(20px); border-top: 1px solid var(--border-soft);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+body.light .bottom-nav { background: rgba(255,255,255,.9); }
+.bottom-item {
+  background: none; border: none; color: var(--ink-faint); display: flex; flex-direction: column;
+  align-items: center; gap: 4px; font-size: 10.5px; font-weight: 500; cursor: pointer; width: 56px;
+}
+.bottom-item.active { color: var(--accent); }
+.bottom-item .nav-avatar { width: 21px; height: 21px; }
+.bottom-fab {
+  width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(155deg, var(--accent), #6644e0);
+  color: #fff; margin-top: -26px; box-shadow: 0 10px 24px rgba(124,92,252,.45);
+}
+
+/* ---------------- Modal ---------------- */
+.modal {
+  position: fixed; inset: 0; z-index: 200; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(4px);
+}
+@media (min-width: 720px) { .modal { align-items: center; } }
+.modal-sheet {
+  background: var(--void-2); border: 1px solid var(--border); width: 100%; max-width: 460px;
+  border-radius: 22px 22px 0 0; padding: 20px; max-height: 78vh; display: flex; flex-direction: column;
+  animation: sheet-in .3s var(--ease);
+}
+@media (min-width: 720px) { .modal-sheet { border-radius: var(--radius-lg); max-height: 70vh; } }
+@keyframes sheet-in { from { transform: translateY(30px); opacity: 0; } to { transform:none; opacity:1; } }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.modal-head h3 { font-size: 17px; }
+.modal-search {
+  background: var(--surface); border: 1px solid var(--border); color: var(--ink); padding: 12px 14px;
+  border-radius: var(--radius-sm); font-size: 14px; outline: none; margin-bottom: 12px;
+}
+.modal-search:focus { border-color: var(--accent); }
+#new-call-list { overflow-y: auto; }
+
+/* ---------------- Call screens ---------------- */
+.call-screen {
+  position: fixed; inset: 0; z-index: 300; background: var(--void); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.call-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(640px 480px at 20% 10%, rgba(124,92,252,.35), transparent 60%),
+    radial-gradient(520px 420px at 85% 85%, rgba(34,214,184,.18), transparent 55%),
+    #0a0a0f;
+}
+
+/* incoming */
+.incoming-content {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  position: relative; z-index: 2; padding: 0 24px; text-align: center;
+}
+.incoming-kicker { color: var(--ink-dim); font-size: 13.5px; font-weight: 600; letter-spacing: .01em; margin-bottom: 18px; }
+.incoming-avatar-wrap { position: relative; width: 132px; height: 132px; display: flex; align-items: center; justify-content: center; margin-bottom: 22px; }
+.incoming-avatar-wrap.small { width: 100px; height: 100px; margin-bottom: 16px; }
+.incoming-avatar-wrap img {
+  width: 112px; height: 112px; border-radius: 50%; object-fit: cover; background: var(--surface-hi);
+  border: 2px solid var(--border); position: relative; z-index: 2;
+}
+.incoming-avatar-wrap.small img { width: 88px; height: 88px; }
+.ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid rgba(124,92,252,.5); animation: ring-pulse 2.2s var(--ease) infinite; }
+.ring2 { animation-delay: .5s; } .ring3 { animation-delay: 1s; }
+@keyframes ring-pulse { 0% { transform: scale(.85); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
+#incoming-name, #active-name { font-size: 25px; }
+.incoming-username { color: var(--ink-dim); font-size: 14px; }
+
+.incoming-actions {
+  position: relative; z-index: 2; display: flex; justify-content: space-around; padding: 0 40px 48px;
+  padding-bottom: calc(48px + env(safe-area-inset-bottom));
+}
+.call-action { background: none; border: none; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; color: var(--ink); }
+.call-action span:last-child { font-size: 12.5px; color: var(--ink-dim); }
+.call-action div, .call-action svg { pointer-events: none; }
+.call-action.decline svg, .call-action.accept svg { pointer-events: none; }
+.call-action::before {
+  content: ''; display: block; width: 64px; height: 64px; border-radius: 50%; margin: 0 auto;
+}
+.call-action { position: relative; }
+.call-action svg { position: absolute; top: 0; left: 50%; transform: translate(-50%, 0); margin-top: 19px; }
+.call-action.decline::before { background: var(--danger); }
+.call-action.accept::before { background: var(--accent-2); }
+
+/* active call */
+#active-call-screen { background: #060608; }
+.video-layer { position: absolute; inset: 0; }
+#remote-video { width: 100%; height: 100%; object-fit: cover; background: #050506; }
+#local-video {
+  position: absolute; width: 108px; height: 148px; border-radius: 16px; object-fit: cover;
+  bottom: 118px; right: 16px; border: 1.5px solid rgba(255,255,255,.18); background: #111; z-index: 5;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.voice-layer { position: relative; flex: 1; }
+.voice-content {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; z-index: 2;
+}
+.call-status { color: var(--ink-dim); font-size: 14px; }
+
+.call-topbar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; justify-content: center;
+  padding: calc(18px + env(safe-area-inset-top)) 16px 12px; gap: 10px; align-items: center;
+}
+.call-status-pill {
+  background: rgba(0,0,0,.45); backdrop-filter: blur(8px); color: var(--ink); font-size: 12.5px; font-weight: 500;
+  padding: 6px 13px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
+}
+.call-timer { color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; background: rgba(0,0,0,.45); padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); }
+
+.call-controls {
+  position: relative; z-index: 10; display: flex; justify-content: center; align-items: center; gap: 14px;
+  padding: 18px 16px calc(30px + env(safe-area-inset-bottom));
+}
+.ctrl-btn {
+  width: 54px; height: 54px; border-radius: 50%; background: rgba(255,255,255,.1); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.14); color: #fff; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s, transform .15s;
+}
+.ctrl-btn:active { transform: scale(.94); }
+.ctrl-btn.active-state { background: #fff; color: #0a0a0f; }
+.end-btn { background: var(--danger); border-color: var(--danger); width: 60px; height: 60px; }
+.end-btn:hover { filter: brightness(1.08); }
+
+/* ---------------- Responsive: tablet+ ---------------- */
+@media (min-width: 860px) {
+  .sidebar { display: flex; }
+  .bottom-nav { display: none; }
+  .views { padding: 26px 32px 40px; }
+  .topbar { padding: 0 28px; }
+  .topbar-title { display: block; margin-right: 6px; }
+  .topbar-search { max-width: 360px; }
+  .search-panel { left: auto; width: 400px; }
+  #local-video { width: 160px; height: 210px; bottom: 130px; right: 28px; }
+}
+
+@media (max-width: 859px) {
+  .topbar-search { max-width: none; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* Focus visibility */
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- ============ TOAST / ERROR CONTAINER ============ -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- ============ LOADING SPLASH ============ -->
+<div id="splash">
+  <div class="splash-mark">
+    <span class="splash-ring"></span>
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none"><path d="M4 12c2-4 4-6 8-6s6 2 8 6c-2 4-4 6-8 6s-6-2-8-6Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></svg>
+  </div>
+  <p>Wavelength</p>
+</div>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div id="auth-screen" class="screen hidden">
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M4 12c2-4 4-6 8-6s6 2 8 6c-2 4-4 6-8 6s-6-2-8-6Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></svg>
+      </div>
+      <span>Wavelength</span>
+    </div>
+
+    <!-- LOGIN -->
+    <form id="login-form" class="auth-form" novalidate>
+      <h1>Welcome back</h1>
+      <p class="auth-sub">Sign in to pick up where you left off.</p>
+      <label class="field">
+        <span>Email</span>
+        <input type="email" id="login-email" autocomplete="email" required placeholder="you@example.com" />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••" />
+      </label>
+      <button type="button" class="link-btn" id="go-reset">Forgot password?</button>
+      <button type="submit" class="btn btn-primary btn-block" id="login-submit">
+        <span class="btn-label">Sign in</span>
+        <span class="btn-spinner"></span>
+      </button>
+      <p class="auth-switch">New here? <button type="button" class="link-btn" id="go-register">Create an account</button></p>
+    </form>
+
+    <!-- REGISTER -->
+    <form id="register-form" class="auth-form hidden" novalidate>
+      <h1>Create your account</h1>
+      <p class="auth-sub">Set up your profile to start calling.</p>
+
+      <label class="avatar-picker" for="reg-photo">
+        <img id="reg-photo-preview" alt="" />
+        <span class="avatar-picker-icon">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 8h3l1.5-2h7L17 8h3v11H4V8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.3" stroke="currentColor" stroke-width="1.6"/></svg>
+        </span>
+        <input type="file" id="reg-photo" accept="image/*" hidden />
+      </label>
+
+      <label class="field">
+        <span>Full name</span>
+        <input type="text" id="reg-name" required placeholder="Ada Lovelace" />
+      </label>
+      <label class="field">
+        <span>Username</span>
+        <input type="text" id="reg-username" required placeholder="adalovelace" pattern="[a-z0-9_\.]{3,20}" />
+      </label>
+      <label class="field">
+        <span>Email</span>
+        <input type="email" id="reg-email" autocomplete="email" required placeholder="you@example.com" />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" id="reg-password" autocomplete="new-password" required minlength="6" placeholder="At least 6 characters" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block" id="register-submit">
+        <span class="btn-label">Create account</span>
+        <span class="btn-spinner"></span>
+      </button>
+      <p class="auth-switch">Already have an account? <button type="button" class="link-btn" id="go-login">Sign in</button></p>
+    </form>
+
+    <!-- RESET -->
+    <form id="reset-form" class="auth-form hidden" novalidate>
+      <h1>Reset your password</h1>
+      <p class="auth-sub">We'll email you a link to get back in.</p>
+      <label class="field">
+        <span>Email</span>
+        <input type="email" id="reset-email" required placeholder="you@example.com" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block" id="reset-submit">
+        <span class="btn-label">Send reset link</span>
+        <span class="btn-spinner"></span>
+      </button>
+      <p class="auth-switch"><button type="button" class="link-btn" id="reset-back">Back to sign in</button></p>
+    </form>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app-shell" class="screen hidden">
+
+  <!-- Desktop sidebar -->
+  <nav class="sidebar" aria-label="Primary">
+    <div class="brand-mark sidebar-brand">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 12c2-4 4-6 8-6s6 2 8 6c-2 4-4 6-8 6s-6-2-8-6Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></svg>
+    </div>
+    <button class="nav-item active" data-view="home" aria-label="Home">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 11.5 12 4l8 7.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M6 10v9h12v-9" stroke="currentColor" stroke-width="1.7"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="nav-item" data-view="calls" aria-label="Calls">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 4c1 4 2.5 7 5 9.5S15 17 19 18l1-3.4-4-1.4-1.4 1.6a11 11 0 0 1-5.4-5.4L11 7.4 9.6 3.4 6 4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span>Calls</span>
+    </button>
+    <button class="nav-item" data-view="contacts" aria-label="Contacts">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><circle cx="12" cy="8.5" r="3.3" stroke="currentColor" stroke-width="1.6"/><path d="M5 20c1-4 3.6-6 7-6s6 2 7 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Contacts</span>
+    </button>
+    <button class="nav-item" data-view="profile" aria-label="Profile">
+      <span class="nav-avatar" id="sidebar-avatar"></span>
+      <span>Profile</span>
+    </button>
+    <button class="nav-item" data-view="settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M19 12.5a7 7 0 0 0 .06-1l1.9-1.5-1.6-2.8-2.3.7a7 7 0 0 0-1.7-1l-.4-2.4h-3.2l-.4 2.4a7 7 0 0 0-1.7 1l-2.3-.7-1.6 2.8L7.6 11a7 7 0 0 0 0 2L5.7 14.5l1.6 2.8 2.3-.7a7 7 0 0 0 1.7 1l.4 2.4h3.2l.4-2.4a7 7 0 0 0 1.7-1l2.3.7 1.6-2.8-1.9-1.5c.04-.33.06-.66.06-1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <span>Settings</span>
+    </button>
+    <button class="nav-item nav-logout" id="sidebar-logout">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15 8l4 4-4 4M9 12h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Log out</span>
+    </button>
+  </nav>
+
+  <div class="main-col">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-title" id="topbar-title">Home</div>
+      <div class="topbar-search">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="m20 20-3.6-3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input type="text" id="search-input" placeholder="Search name, username or email" autocomplete="off" />
+      </div>
+      <div class="topbar-actions">
+        <span class="net-dot" id="net-dot" title="Connection"></span>
+        <button class="icon-btn" id="notif-btn" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 14 6 10Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0" stroke="currentColor" stroke-width="1.6"/></svg>
+          <span class="badge-dot hidden" id="notif-dot"></span>
+        </button>
+        <button class="icon-btn new-call-fab" id="new-call-btn" aria-label="New call">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="topbar-avatar" id="topbar-avatar" data-view="profile" aria-label="Your profile"></button>
+      </div>
+    </header>
+
+    <!-- Notifications dropdown -->
+    <div class="notif-panel hidden" id="notif-panel">
+      <div class="notif-panel-head">Notifications</div>
+      <div id="notif-list" class="notif-list">
+        <p class="empty-note">You're all caught up.</p>
+      </div>
+    </div>
+
+    <!-- Search results dropdown -->
+    <div class="search-panel hidden" id="search-panel">
+      <div id="search-results"></div>
+    </div>
+
+    <!-- ===== VIEWS ===== -->
+    <main class="views">
+
+      <!-- HOME -->
+      <section class="view active" id="view-home">
+        <div class="hero-card">
+          <div class="hero-copy">
+            <span class="eyebrow-free">You're online</span>
+            <h2>Ready when they are.</h2>
+            <p>Start a voice or video call the moment someone's free — presence updates live.</p>
+          </div>
+          <button class="btn btn-light" id="hero-new-call">New call</button>
+        </div>
+
+        <div class="section-row">
+          <h3>Online now</h3>
+        </div>
+        <div class="online-strip" id="online-strip">
+          <p class="empty-note">No contacts online right now.</p>
+        </div>
+
+        <div class="section-row">
+          <h3>Recent calls</h3>
+          <button class="text-btn" data-view="calls">See all</button>
+        </div>
+        <div class="list" id="home-recent-list">
+          <p class="empty-note">No calls yet — find a contact and say hello.</p>
+        </div>
+      </section>
+
+      <!-- CALLS / HISTORY -->
+      <section class="view" id="view-calls">
+        <div class="filter-row" id="calls-filter">
+          <button class="chip active" data-filter="all">All</button>
+          <button class="chip" data-filter="missed">Missed</button>
+          <button class="chip" data-filter="incoming">Incoming</button>
+          <button class="chip" data-filter="outgoing">Outgoing</button>
+          <button class="chip" data-filter="voice">Voice</button>
+          <button class="chip" data-filter="video">Video</button>
+        </div>
+        <div class="list" id="calls-list">
+          <p class="empty-note">Your call history will show up here.</p>
+        </div>
+      </section>
+
+      <!-- CONTACTS -->
+      <section class="view" id="view-contacts">
+        <div class="filter-row">
+          <button class="chip active" data-cfilter="all">All</button>
+          <button class="chip" data-cfilter="favorites">Favorites</button>
+          <button class="chip" data-cfilter="online">Online</button>
+        </div>
+        <div class="list" id="contacts-list">
+          <p class="empty-note">No contacts yet. Search above to add someone.</p>
+        </div>
+      </section>
+
+      <!-- PROFILE (own + viewed) -->
+      <section class="view" id="view-profile">
+        <div class="profile-card">
+          <div class="profile-photo-wrap">
+            <img id="profile-photo" alt="" />
+            <span class="presence-dot" id="profile-presence"></span>
+          </div>
+          <h2 id="profile-name">—</h2>
+          <p class="profile-username" id="profile-username">@—</p>
+          <p class="profile-status" id="profile-status-text">Offline</p>
+          <p class="profile-about" id="profile-about"></p>
+
+          <div class="profile-actions" id="profile-actions-self">
+            <button class="btn btn-secondary" id="edit-profile-btn">Edit profile</button>
+          </div>
+
+          <div class="profile-actions hidden" id="profile-actions-other">
+            <button class="btn btn-primary" id="profile-voice-call">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M5 4c1 4 2.5 7 5 9.5S15 17 19 18l1-3.4-4-1.4-1.4 1.6a11 11 0 0 1-5.4-5.4L11 7.4 9.6 3.4 6 4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              Voice
+            </button>
+            <button class="btn btn-primary" id="profile-video-call">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><rect x="3" y="6.5" width="12" height="11" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 21 7v10l-6-3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              Video
+            </button>
+            <button class="btn btn-secondary" id="profile-add-contact">Add contact</button>
+            <button class="btn btn-secondary" id="profile-fav-contact">☆ Favorite</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- EDIT PROFILE -->
+      <section class="view" id="view-edit-profile">
+        <form id="edit-profile-form" class="auth-form edit-form">
+          <label class="avatar-picker" for="edit-photo">
+            <img id="edit-photo-preview" alt="" />
+            <span class="avatar-picker-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 8h3l1.5-2h7L17 8h3v11H4V8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.3" stroke="currentColor" stroke-width="1.6"/></svg>
+            </span>
+            <input type="file" id="edit-photo" accept="image/*" hidden />
+          </label>
+          <label class="field">
+            <span>Full name</span>
+            <input type="text" id="edit-name" required />
+          </label>
+          <label class="field">
+            <span>About</span>
+            <input type="text" id="edit-about" maxlength="80" placeholder="Say something about yourself" />
+          </label>
+          <div class="edit-actions">
+            <button type="button" class="btn btn-secondary" id="edit-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="edit-save">
+              <span class="btn-label">Save changes</span>
+              <span class="btn-spinner"></span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" id="view-settings">
+        <div class="settings-group">
+          <h4>Account</h4>
+          <button class="settings-row" data-view="edit-profile">
+            <span>Edit profile</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="settings-row" id="settings-logout">
+            <span>Log out</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+
+        <div class="settings-group">
+          <h4>Privacy</h4>
+          <label class="settings-row toggle-row">
+            <span>Show online status</span>
+            <span class="toggle"><input type="checkbox" id="toggle-online-status" checked /><span class="toggle-slider"></span></span>
+          </label>
+          <label class="settings-row toggle-row">
+            <span>Show last seen</span>
+            <span class="toggle"><input type="checkbox" id="toggle-last-seen" checked /><span class="toggle-slider"></span></span>
+          </label>
+          <label class="settings-row toggle-row">
+            <span>Allow calls from anyone</span>
+            <span class="toggle"><input type="checkbox" id="toggle-call-permission" checked /><span class="toggle-slider"></span></span>
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h4>Notifications</h4>
+          <label class="settings-row toggle-row">
+            <span>Incoming calls</span>
+            <span class="toggle"><input type="checkbox" id="toggle-notif-incoming" checked /><span class="toggle-slider"></span></span>
+          </label>
+          <label class="settings-row toggle-row">
+            <span>Missed calls</span>
+            <span class="toggle"><input type="checkbox" id="toggle-notif-missed" checked /><span class="toggle-slider"></span></span>
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h4>Appearance</h4>
+          <label class="settings-row toggle-row">
+            <span>Light mode</span>
+            <span class="toggle"><input type="checkbox" id="toggle-light-mode" /><span class="toggle-slider"></span></span>
+          </label>
+        </div>
+
+        <div class="settings-group hidden" id="install-app-group">
+          <h4>App</h4>
+          <button class="settings-row" id="install-app-btn">
+            <span>Install Wavelength</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 4v11m0 0-4-4m4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 18v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="settings-group hidden" id="installed-app-group">
+          <div class="empty-note" style="padding:4px;">Wavelength is installed on this device.</div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Mobile bottom nav -->
+    <nav class="bottom-nav" aria-label="Primary">
+      <button class="bottom-item active" data-view="home">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none"><path d="M4 11.5 12 4l8 7.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M6 10v9h12v-9" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="bottom-item" data-view="calls">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none"><path d="M5 4c1 4 2.5 7 5 9.5S15 17 19 18l1-3.4-4-1.4-1.4 1.6a11 11 0 0 1-5.4-5.4L11 7.4 9.6 3.4 6 4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span>Calls</span>
+      </button>
+      <button class="bottom-item bottom-fab" id="bottom-new-call">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="bottom-item" data-view="contacts">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none"><circle cx="12" cy="8.5" r="3.3" stroke="currentColor" stroke-width="1.6"/><path d="M5 20c1-4 3.6-6 7-6s6 2 7 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>Contacts</span>
+      </button>
+      <button class="bottom-item" data-view="profile">
+        <span class="nav-avatar" id="bottom-avatar"></span>
+        <span>Profile</span>
+      </button>
+    </nav>
+  </div>
+</div>
+
+<!-- ============ NEW CALL MODAL ============ -->
+<div id="new-call-modal" class="modal hidden">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <h3>Start a call</h3>
+      <button class="icon-btn" id="close-new-call">✕</button>
+    </div>
+    <input type="text" id="new-call-search" placeholder="Search contacts" class="modal-search" />
+    <div id="new-call-list" class="list"></div>
+  </div>
+</div>
+
+<!-- ============ INCOMING CALL OVERLAY ============ -->
+<div id="incoming-call-screen" class="call-screen hidden">
+  <div class="call-bg"></div>
+  <div class="incoming-content">
+    <p class="incoming-kicker" id="incoming-type-label">Incoming Voice Call</p>
+    <div class="incoming-avatar-wrap">
+      <span class="ring ring1"></span><span class="ring ring2"></span><span class="ring ring3"></span>
+      <img id="incoming-photo" alt="" />
+    </div>
+    <h1 id="incoming-name">—</h1>
+    <p class="incoming-username" id="incoming-username">@—</p>
+  </div>
+  <div class="incoming-actions">
+    <button class="call-action decline" id="decline-call-btn" aria-label="Decline">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none"><path d="M19 4 5 18M5 4l14 14" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <span>Decline</span>
+    </button>
+    <button class="call-action accept" id="accept-call-btn" aria-label="Accept">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none"><path d="M5 4c1 4 2.5 7 5 9.5S15 17 19 18l1-3.4-4-1.4-1.4 1.6a11 11 0 0 1-5.4-5.4L11 7.4 9.6 3.4 6 4Z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span>Accept</span>
+    </button>
+  </div>
+</div>
+
+<!-- ============ ACTIVE CALL OVERLAY ============ -->
+<div id="active-call-screen" class="call-screen hidden">
+  <!-- Video layer -->
+  <div class="video-layer hidden" id="video-layer">
+    <video id="remote-video" autoplay playsinline></video>
+    <video id="local-video" autoplay playsinline muted></video>
+  </div>
+
+  <!-- Voice layer -->
+  <div class="voice-layer hidden" id="voice-layer">
+    <div class="call-bg"></div>
+    <div class="voice-content">
+      <div class="incoming-avatar-wrap small">
+        <span class="ring ring1"></span><span class="ring ring2"></span>
+        <img id="active-photo" alt="" />
+      </div>
+      <h1 id="active-name">—</h1>
+      <p class="call-status" id="call-status-text">Calling…</p>
+    </div>
+  </div>
+
+  <div class="call-topbar">
+    <span class="call-status-pill" id="call-status-pill">Connecting…</span>
+    <span class="call-timer hidden" id="call-timer">00:00</span>
+  </div>
+
+  <div class="call-controls">
+    <button class="ctrl-btn" id="toggle-mic-btn" aria-label="Mute">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.6"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <button class="ctrl-btn hidden" id="toggle-cam-btn" aria-label="Camera">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><rect x="3" y="6.5" width="12" height="11" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 21 7v10l-6-3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="ctrl-btn hidden" id="switch-cam-btn" aria-label="Switch camera">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M17 2 21 6l-4 4M7 22 3 18l4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 6H8a5 5 0 0 0-5 5M3 18h13a5 5 0 0 0 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <button class="ctrl-btn" id="toggle-speaker-btn" aria-label="Speaker">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M17 9a4 4 0 0 1 0 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <button class="ctrl-btn end-btn" id="end-call-btn" aria-label="End call">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M19 4 5 18M5 4l14 14" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ============ FIREBASE SDK (v10 compat build via CDN) ============ -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+
+<script>
+/* =====================================================================
+   WAVELENGTH — app.js
+   Frontend-only voice/video calling app.
+   Firebase Auth + Realtime Database for identity, presence, contacts,
+   call metadata and WebRTC signaling. WebRTC handles the actual media.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   1. FIREBASE CONFIGURATION
+   Paste your Firebase project's config object below. Get this from:
+   Firebase Console → Project settings → General → "Your apps" → SDK setup.
+   --------------------------------------------------------------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBb4JlmcWlXyR1h-UE_4hXw9StFLoXz5cc",
+  authDomain: "mark-3b013.firebaseapp.com",
+  databaseURL: "https://mark-3b013-default-rtdb.firebaseio.com",
+  projectId: "mark-3b013",
+  storageBucket: "mark-3b013.firebasestorage.app",
+  messagingSenderId: "912636606904",
+  appId: "1:912636606904:web:4b6526e95b9f718472374d",
+  measurementId: "G-YNB7SVDQH2"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+/* ---------------------------------------------------------------------
+   2. WEBRTC CONFIG — public STUN servers (no TURN provided; add your own
+   TURN server here for reliable calls across restrictive NATs).
+   --------------------------------------------------------------------- */
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ]
+};
+const CALL_TIMEOUT_MS = 45000;
+
+/* ---------------------------------------------------------------------
+   3. STATE
+   --------------------------------------------------------------------- */
+const state = {
+  uid: null,
+  profile: null,
+  contactsMap: {},          // contactUid -> {favorite, addedAt}
+  usersCache: {},           // uid -> user object (from search / contacts / presence)
+  presenceMap: {},          // uid -> {online, state}
+  currentView: "home",
+  viewedProfileUid: null,   // uid currently shown in #view-profile (may be self)
+  callLogsCache: [],
+  notifications: [],
+  pendingIncoming: null,    // {callId, callerId, type}
+  call: null,               // active/ongoing call session object
+  settings: defaultSettings(),
+  lightMode: false
+};
+
+function defaultSettings() {
+  return {
+    showOnlineStatus: true,
+    showLastSeen: true,
+    allowCallsFromAnyone: true,
+    notifIncoming: true,
+    notifMissed: true
+  };
+}
+
+/* ---------------------------------------------------------------------
+   4. DOM HELPERS
+   --------------------------------------------------------------------- */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+function showToast(message, kind = "info") {
+  const container = $("#toast-container");
+  const el = document.createElement("div");
+  el.className = `toast ${kind}`;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.classList.add("toast-fade");
+    setTimeout(() => el.remove(), 320);
+  }, 3800);
+}
+
+function friendlyAuthError(err) {
+  const map = {
+    "auth/invalid-email": "That email address doesn't look right.",
+    "auth/user-disabled": "This account has been disabled.",
+    "auth/user-not-found": "No account found with that email.",
+    "auth/wrong-password": "Incorrect password. Try again.",
+    "auth/email-already-in-use": "An account already exists with that email.",
+    "auth/weak-password": "Choose a password with at least 6 characters.",
+    "auth/network-request-failed": "You appear to be offline. Check your connection.",
+    "auth/too-many-requests": "Too many attempts. Please wait a moment and try again.",
+    "auth/invalid-credential": "Incorrect email or password."
+  };
+  return map[err.code] || err.message || "Something went wrong. Please try again.";
+}
+
+function initials(name = "") {
+  return name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() || "").join("") || "?";
+}
+
+// Generates a small circular avatar (data URI) with initials, used whenever
+// a user has no uploaded photo — avoids ever showing a broken image.
+function avatarDataUri(name, seedKey = "") {
+  const colors = ["#7c5cfc", "#22d6b8", "#ff5470", "#ffb454", "#4f9dff", "#c85cff"];
+  let hash = 0;
+  const seed = seedKey || name || "?";
+  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  const color = colors[Math.abs(hash) % colors.length];
+  const label = initials(name);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect width="96" height="96" rx="48" fill="${color}"/><text x="50%" y="53%" font-family="Space Grotesk,Inter,sans-serif" font-size="34" fill="#fff" text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+}
+
+function photoOf(user) {
+  return (user && user.photo) ? user.photo : avatarDataUri(user?.name, user?.uid);
+}
+
+function setBg(el, url) { if (el) el.style.backgroundImage = `url("${url}")`; }
+
+function timeAgo(ts) {
+  if (!ts) return "";
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+function formatDuration(sec = 0) {
+  sec = Math.max(0, Math.floor(sec));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function debounce(fn, wait) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+}
+
+function escapeHtml(str = "") {
+  return str.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------------------------------------------------------------------
+   5. IMAGE COMPRESSION (for profile photos — stored as base64 in RTDB
+   since no Firebase Storage bucket is required by this build)
+   --------------------------------------------------------------------- */
+function fileToCompressedDataUrl(file, maxSize = 240, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve(null);
+    if (!file.type.startsWith("image/")) return reject(new Error("Please choose an image file."));
+    if (file.size > 8 * 1024 * 1024) return reject(new Error("Image is too large (max 8MB)."));
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; };
+    reader.onerror = () => reject(new Error("Could not read that image."));
+    img.onload = () => {
+      let { width, height } = img;
+      const scale = Math.min(1, maxSize / Math.max(width, height));
+      width = Math.round(width * scale); height = Math.round(height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => reject(new Error("Could not process that image."));
+    reader.readAsDataURL(file);
+  });
+}
+
+/* =====================================================================
+   6. VIEW / NAVIGATION
+   ===================================================================== */
+function showScreen(id) {
+  $$(".screen").forEach(s => s.classList.add("hidden"));
+  $(`#${id}`).classList.remove("hidden");
+}
+
+function switchAuthForm(which) {
+  ["login-form", "register-form", "reset-form"].forEach(id => $(`#${id}`).classList.add("hidden"));
+  $(`#${which}-form`).classList.remove("hidden");
+}
+
+function navigateTo(view) {
+  state.currentView = view;
+  $$(".view").forEach(v => v.classList.remove("active"));
+  const target = $(`#view-${view}`);
+  if (target) target.classList.add("active");
+
+  $$(".nav-item, .bottom-item").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.view === view);
+  });
+
+  const titles = { home: "Home", calls: "Calls", contacts: "Contacts", profile: "Profile", settings: "Settings", "edit-profile": "Edit profile" };
+  $("#topbar-title").textContent = titles[view] || "Wavelength";
+
+  closePanels();
+
+  if (view === "profile" && !state.viewedProfileUid) renderProfileView(state.uid);
+  if (view === "calls") renderCallHistory();
+  if (view === "contacts") renderContacts();
+}
+
+function closePanels() {
+  $("#notif-panel").classList.add("hidden");
+  $("#search-panel").classList.add("hidden");
+}
+
+$$("[data-view]").forEach(el => {
+  el.addEventListener("click", () => {
+    if (el.id === "topbar-avatar") state.viewedProfileUid = state.uid;
+    navigateTo(el.dataset.view);
+  });
+});
+
+/* =====================================================================
+   7. AUTHENTICATION
+   ===================================================================== */
+let regPhotoDataUrl = null;
+
+$("#go-register").addEventListener("click", () => switchAuthForm("register"));
+$("#go-login").addEventListener("click", () => switchAuthForm("login"));
+$("#go-reset").addEventListener("click", () => switchAuthForm("reset"));
+$("#reset-back").addEventListener("click", () => switchAuthForm("login"));
+
+$("#reg-photo-preview").src = avatarDataUri("");
+$("#reg-photo").addEventListener("change", async e => {
+  try {
+    const url = await fileToCompressedDataUrl(e.target.files[0]);
+    if (url) { regPhotoDataUrl = url; $("#reg-photo-preview").src = url; }
+  } catch (err) { showToast(err.message, "error"); }
+});
+
+function setBtnLoading(btn, loading) { btn.classList.toggle("loading", loading); btn.disabled = loading; }
+
+// --- Login ---
+$("#login-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = $("#login-submit");
+  const email = $("#login-email").value.trim();
+  const password = $("#login-password").value;
+  setBtnLoading(btn, true);
+  try {
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    await auth.signInWithEmailAndPassword(email, password);
+  } catch (err) {
+    showToast(friendlyAuthError(err), "error");
+  } finally {
+    setBtnLoading(btn, false);
+  }
+});
+
+// --- Register ---
+$("#register-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = $("#register-submit");
+  const name = $("#reg-name").value.trim();
+  const username = $("#reg-username").value.trim().toLowerCase();
+  const email = $("#reg-email").value.trim();
+  const password = $("#reg-password").value;
+
+  if (!/^[a-z0-9_.]{3,20}$/.test(username)) {
+    showToast("Username must be 3–20 characters: letters, numbers, . or _", "error");
+    return;
+  }
+
+  setBtnLoading(btn, true);
+  try {
+    const takenSnap = await db.ref(`usernames/${username}`).get();
+    if (takenSnap.exists()) throw { code: "custom/username-taken", message: "That username is already taken." };
+
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    const cred = await auth.createUserWithEmailAndPassword(email, password);
+    const uid = cred.user.uid;
+
+    const photo = regPhotoDataUrl || avatarDataUri(name, uid);
+    const userRecord = {
+      uid, name, username,
+      nameLower: name.toLowerCase(),
+      usernameLower: username,
+      emailLower: email.toLowerCase(),
+      email, photo, about: "",
+      online: true, lastSeen: firebase.database.ServerValue.TIMESTAMP,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      settings: defaultSettings()
+    };
+
+    await db.ref(`users/${uid}`).set(userRecord);
+    await db.ref(`usernames/${username}`).set(uid);
+    showToast("Account created — welcome!", "success");
+  } catch (err) {
+    showToast(friendlyAuthError(err), "error");
+  } finally {
+    setBtnLoading(btn, false);
+  }
+});
+
+// --- Password reset ---
+$("#reset-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = $("#reset-submit");
+  const email = $("#reset-email").value.trim();
+  setBtnLoading(btn, true);
+  try {
+    await auth.sendPasswordResetEmail(email);
+    showToast("Reset link sent — check your inbox.", "success");
+    switchAuthForm("login");
+  } catch (err) {
+    showToast(friendlyAuthError(err), "error");
+  } finally {
+    setBtnLoading(btn, false);
+  }
+});
+
+// --- Logout ---
+async function doLogout() {
+  try {
+    if (state.uid) {
+      await db.ref(`users/${state.uid}`).update({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP });
+      db.ref(`presence/${state.uid}`).set({ state: "offline", lastChanged: firebase.database.ServerValue.TIMESTAMP });
+    }
+    await auth.signOut();
+  } catch (err) {
+    showToast(friendlyAuthError(err), "error");
+  }
+}
+$("#sidebar-logout").addEventListener("click", doLogout);
+$("#settings-logout").addEventListener("click", doLogout);
+
+/* =====================================================================
+   8. AUTH STATE / BOOTSTRAP
+   ===================================================================== */
+let listenersAttached = false;
+
+auth.onAuthStateChanged(async user => {
+  $("#splash").classList.add("hidden");
+  if (user) {
+    state.uid = user.uid;
+    showScreen("app-shell");
+    await bootstrapUser(user.uid);
+  } else {
+    teardownListeners();
+    state.uid = null;
+    showScreen("auth-screen");
+    switchAuthForm("login");
+  }
+});
+
+async function bootstrapUser(uid) {
+  const snap = await db.ref(`users/${uid}`).get();
+  if (!snap.exists()) { showToast("Profile data missing — please contact support.", "error"); return; }
+  state.profile = snap.val();
+  applySettingsToUI(state.profile.settings || defaultSettings());
+
+  await db.ref(`users/${uid}`).update({ online: true, lastSeen: firebase.database.ServerValue.TIMESTAMP });
+  setupPresence(uid);
+
+  updateOwnUIChrome();
+  if (!listenersAttached) {
+    attachIncomingCallListener(uid);
+    attachContactsListener(uid);
+    attachUsersPresenceListener();
+    attachNotificationsListener(uid);
+    attachCallLogsListener(uid);
+    listenersAttached = true;
+  }
+  navigateTo("home");
+}
+
+function teardownListeners() {
+  listenersAttached = false;
+  if (state.uid) {
+    db.ref(`calls`).off();
+    db.ref(`incomingCalls/${state.uid}`).off();
+    db.ref(`contacts/${state.uid}`).off();
+    db.ref(`presence`).off();
+    db.ref(`notifications/${state.uid}`).off();
+    db.ref(`callLogs/${state.uid}`).off();
+  }
+  state.contactsMap = {};
+  state.presenceMap = {};
+  state.callLogsCache = [];
+  state.notifications = [];
+}
+
+function updateOwnUIChrome() {
+  const url = photoOf(state.profile);
+  setBg($("#sidebar-avatar"), url);
+  setBg($("#topbar-avatar"), url);
+  setBg($("#bottom-avatar"), url);
+}
+
+/* ---------------------------------------------------------------------
+   Presence: mark online while connected, offline on disconnect.
+   --------------------------------------------------------------------- */
+function setupPresence(uid) {
+  const myPresenceRef = db.ref(`presence/${uid}`);
+  const myStatusUserRef = db.ref(`users/${uid}`);
+  const connectedRef = db.ref(".info/connected");
+  connectedRef.on("value", snap => {
+    if (snap.val() === false) return;
+    myPresenceRef.onDisconnect().set({ state: "offline", lastChanged: firebase.database.ServerValue.TIMESTAMP });
+    myStatusUserRef.onDisconnect().update({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP });
+    myPresenceRef.set({ state: "online", lastChanged: firebase.database.ServerValue.TIMESTAMP });
+  });
+}
+
+function setPresenceState(uid, s) {
+  db.ref(`presence/${uid}`).set({ state: s, lastChanged: firebase.database.ServerValue.TIMESTAMP });
+}
+
+// Heartbeat: keep presence fresh even when the OS throttles the tab,
+// and recover oncall/online state after network drops.
+setInterval(() => {
+  if (!state.uid) return;
+  const s = (state.call && state.call.status !== "idle") ? "oncall" : "online";
+  db.ref(`presence/${state.uid}`).set({ state: s, lastChanged: firebase.database.ServerValue.TIMESTAMP }).catch(() => {});
+}, 20000);
+
+function attachUsersPresenceListener() {
+  db.ref("presence").on("value", snap => {
+    state.presenceMap = snap.val() || {};
+    renderOnlineStrip();
+    renderContacts();
+    renderCallHistory();
+    if (state.viewedProfileUid) renderProfileView(state.viewedProfileUid);
+    updateSearchPresenceBadges();
+  });
+}
+
+/* =====================================================================
+   9. CONTACTS
+   ===================================================================== */
+function attachContactsListener(uid) {
+  db.ref(`contacts/${uid}`).on("value", async snap => {
+    state.contactsMap = snap.val() || {};
+    const uids = Object.keys(state.contactsMap);
+    await Promise.all(uids.map(cacheUser));
+    renderContacts();
+    renderOnlineStrip();
+  });
+}
+
+async function cacheUser(uid) {
+  if (state.usersCache[uid]) return state.usersCache[uid];
+  const snap = await db.ref(`users/${uid}`).get();
+  if (snap.exists()) { state.usersCache[uid] = snap.val(); return snap.val(); }
+  return null;
+}
+
+async function addContact(uid) {
+  if (uid === state.uid) return;
+  await db.ref(`contacts/${state.uid}/${uid}`).set({ addedAt: firebase.database.ServerValue.TIMESTAMP, favorite: false });
+  showToast("Contact added.", "success");
+}
+async function removeContact(uid) {
+  await db.ref(`contacts/${state.uid}/${uid}`).remove();
+  showToast("Contact removed.", "info");
+}
+async function toggleFavorite(uid) {
+  const cur = state.contactsMap[uid];
+  if (!cur) return;
+  await db.ref(`contacts/${state.uid}/${uid}/favorite`).set(!cur.favorite);
+}
+
+let contactsFilter = "all";
+$$("[data-cfilter]").forEach(chip => chip.addEventListener("click", () => {
+  $$("[data-cfilter]").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  contactsFilter = chip.dataset.cfilter;
+  renderContacts();
+}));
+
+function presenceOf(uid) {
+  const p = state.presenceMap[uid];
+  const inCall = state.call && (state.call.peerUid === uid) && state.call.status === "ongoing";
+  if (inCall) return "oncall";
+  return p && p.state === "online" ? "online" : "offline";
+}
+
+function renderContacts() {
+  const list = $("#contacts-list");
+  let uids = Object.keys(state.contactsMap);
+  if (contactsFilter === "favorites") uids = uids.filter(u => state.contactsMap[u].favorite);
+  if (contactsFilter === "online") uids = uids.filter(u => presenceOf(u) === "online");
+
+  if (!uids.length) {
+    list.innerHTML = `<p class="empty-note">${contactsFilter === "all" ? "No contacts yet. Search above to add someone." : "Nobody here yet."}</p>`;
+    return;
+  }
+  uids.sort((a, b) => (state.usersCache[a]?.name || "").localeCompare(state.usersCache[b]?.name || ""));
+  list.innerHTML = uids.map(uid => contactRowHtml(uid)).join("");
+
+  $$(".row-card[data-uid]", list).forEach(row => {
+    row.addEventListener("click", e => {
+      if (e.target.closest(".row-icon-btn")) return;
+      openProfile(row.dataset.uid);
+    });
+  });
+  $$("[data-call-voice]", list).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); startCall(b.dataset.callVoice, "voice"); }));
+  $$("[data-call-video]", list).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); startCall(b.dataset.callVideo, "video"); }));
+  $$("[data-fav]", list).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); toggleFavorite(b.dataset.fav); }));
+}
+
+function contactRowHtml(uid) {
+  const u = state.usersCache[uid] || {};
+  const pres = presenceOf(uid);
+  const fav = state.contactsMap[uid]?.favorite;
+  return `
+  <div class="row-card" data-uid="${uid}">
+    <div class="row-avatar-wrap">
+      <div class="row-avatar" style="background-image:url('${photoOf(u)}')"></div>
+      <span class="presence-dot ${pres}"></span>
+    </div>
+    <div class="row-body">
+      <div class="rname">${escapeHtml(u.name || "Unknown")}</div>
+      <div class="rmeta">${pres === "online" ? "Online" : pres === "oncall" ? "On call" : "Offline"}</div>
+    </div>
+    <div class="row-actions">
+      <button class="row-icon-btn fav ${fav ? "active" : ""}" data-fav="${uid}" aria-label="Favorite">${fav ? "★" : "☆"}</button>
+      <button class="row-icon-btn" data-call-voice="${uid}" aria-label="Voice call">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M5 4c1 4 2.5 7 5 9.5S15 17 19 18l1-3.4-4-1.4-1.4 1.6a11 11 0 0 1-5.4-5.4L11 7.4 9.6 3.4 6 4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="row-icon-btn" data-call-video="${uid}" aria-label="Video call">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><rect x="3" y="6.5" width="12" height="11" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 21 7v10l-6-3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderOnlineStrip() {
+  const wrap = $("#online-strip");
+  const onlineUids = Object.keys(state.contactsMap).filter(uid => presenceOf(uid) === "online" || presenceOf(uid) === "oncall");
+  if (!onlineUids.length) { wrap.innerHTML = `<p class="empty-note">No contacts online right now.</p>`; return; }
+  wrap.innerHTML = onlineUids.map(uid => {
+    const u = state.usersCache[uid] || {};
+    return `<div class="online-item" data-uid="${uid}">
+      <div class="online-avatar-wrap"><div class="online-avatar" style="background-image:url('${photoOf(u)}')"></div></div>
+      <span class="oname">${escapeHtml((u.name || "").split(" ")[0] || "")}</span>
+    </div>`;
+  }).join("");
+  $$(".online-item", wrap).forEach(el => el.addEventListener("click", () => openProfile(el.dataset.uid)));
+}
+
+/* =====================================================================
+   10. SEARCH
+   ===================================================================== */
+const searchInput = $("#search-input");
+const searchPanel = $("#search-panel");
+const searchResults = $("#search-results");
+
+searchInput.addEventListener("focus", () => { if (searchInput.value.trim()) searchPanel.classList.remove("hidden"); });
+searchInput.addEventListener("input", debounce(runSearch, 300));
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".topbar-search") && !e.target.closest("#search-panel")) searchPanel.classList.add("hidden");
+  if (!e.target.closest("#notif-btn") && !e.target.closest("#notif-panel")) $("#notif-panel").classList.add("hidden");
+});
+
+async function runSearch() {
+  const qRaw = searchInput.value.trim();
+  if (!qRaw) { searchPanel.classList.add("hidden"); return; }
+  const q = qRaw.toLowerCase();
+  searchPanel.classList.remove("hidden");
+  searchResults.innerHTML = `<p class="empty-note">Searching…</p>`;
+
+  try {
+    const fields = ["nameLower", "usernameLower", "emailLower"];
+    const snaps = await Promise.all(fields.map(f =>
+      db.ref("users").orderByChild(f).startAt(q).endAt(q + "\uf8ff").limitToFirst(10).get()
+    ));
+    const found = {};
+    snaps.forEach(snap => snap.forEach(child => {
+      if (child.key !== state.uid) found[child.key] = child.val();
+    }));
+    const uids = Object.keys(found);
+    uids.forEach(uid => state.usersCache[uid] = found[uid]);
+
+    if (!uids.length) { searchResults.innerHTML = `<p class="empty-note">No one found for "${escapeHtml(qRaw)}".</p>`; return; }
+
+    searchResults.innerHTML = uids.map(uid => {
+      const u = found[uid];
+      const pres = presenceOf(uid);
+      const isContact = !!state.contactsMap[uid];
+      return `
+      <div class="row-card" data-uid="${uid}" style="margin:6px;">
+        <div class="row-avatar-wrap">
+          <div class="row-avatar" style="background-image:url('${photoOf(u)}')"></div>
+          <span class="presence-dot ${pres}"></span>
+        </div>
+        <div class="row-body">
+          <div class="rname">${escapeHtml(u.name)}</div>
+          <div class="rmeta">@${escapeHtml(u.username)} · ${pres === "online" ? "Online" : "Offline"}</div>
+        </div>
+        <div class="row-actions">
+          <button class="row-icon-btn" data-call-voice="${uid}" aria-label="Voice call">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M5 4c1 4 2.5 7 5 9.5S15 17 19 18l1-3.4-4-1.4-1.4 1.6a11 11 0 0 1-5.4-5.4L11 7.4 9.6 3.4 6 4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="row-icon-btn" data-call-video="${uid}" aria-label="Video call">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><rect x="3" y="6.5" width="12" height="11" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 21 7v10l-6-3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>`;
+    }).join("");
+
+    $$(".row-card[data-uid]", searchResults).forEach(row => row.addEventListener("click", e => {
+      if (e.target.closest(".row-icon-btn")) return;
+      searchPanel.classList.add("hidden");
+      openProfile(row.dataset.uid);
+    }));
+    $$("[data-call-voice]", searchResults).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); startCall(b.dataset.callVoice, "voice"); }));
+    $$("[data-call-video]", searchResults).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); startCall(b.dataset.callVideo, "video"); }));
+  } catch (err) {
+    searchResults.innerHTML = `<p class="empty-note">Search failed. Check your connection.</p>`;
+  }
+}
+
+function updateSearchPresenceBadges() {
+  $$("#search-results .presence-dot").forEach(dot => {
+    const uid = dot.closest("[data-uid]")?.dataset.uid;
+    if (!uid) return;
+    dot.className = `presence-dot ${presenceOf(uid)}`;
+  });
+}
+
+/* =====================================================================
+   11. PROFILE VIEW
+   ===================================================================== */
+async function openProfile(uid) {
+  state.viewedProfileUid = uid;
+  await cacheUser(uid);
+  navigateTo("profile");
+  renderProfileView(uid);
+}
+
+function renderProfileView(uid) {
+  const isSelf = uid === state.uid;
+  const u = isSelf ? state.profile : state.usersCache[uid];
+  if (!u) return;
+  $("#profile-photo").src = photoOf(u);
+  $("#profile-name").textContent = u.name;
+  $("#profile-username").textContent = `@${u.username}`;
+  $("#profile-about").textContent = u.about || (isSelf ? "Add a short line about yourself in Edit profile." : "");
+  const pres = isSelf ? "online" : presenceOf(uid);
+  $("#profile-presence").className = `presence-dot ${pres}`;
+  $("#profile-status-text").textContent = pres === "online" ? "Online" : pres === "oncall" ? "On a call" : "Offline";
+
+  $("#profile-actions-self").classList.toggle("hidden", !isSelf);
+  $("#profile-actions-other").classList.toggle("hidden", isSelf);
+
+  if (!isSelf) {
+    const isContact = !!state.contactsMap[uid];
+    const isFav = state.contactsMap[uid]?.favorite;
+    $("#profile-add-contact").textContent = isContact ? "Remove contact" : "Add contact";
+    $("#profile-fav-contact").textContent = isFav ? "★ Favorited" : "☆ Favorite";
+    $("#profile-fav-contact").classList.toggle("hidden", !isContact);
+  }
+}
+
+$("#profile-voice-call").addEventListener("click", () => startCall(state.viewedProfileUid, "voice"));
+$("#profile-video-call").addEventListener("click", () => startCall(state.viewedProfileUid, "video"));
+$("#profile-add-contact").addEventListener("click", async () => {
+  const uid = state.viewedProfileUid;
+  if (state.contactsMap[uid]) await removeContact(uid); else await addContact(uid);
+  renderProfileView(uid);
+});
+$("#profile-fav-contact").addEventListener("click", async () => {
+  await toggleFavorite(state.viewedProfileUid);
+  renderProfileView(state.viewedProfileUid);
+});
+
+// --- Edit profile ---
+let editPhotoDataUrl = null;
+$("#edit-profile-btn").addEventListener("click", () => {
+  editPhotoDataUrl = null;
+  $("#edit-photo-preview").src = photoOf(state.profile);
+  $("#edit-name").value = state.profile.name || "";
+  $("#edit-about").value = state.profile.about || "";
+  navigateTo("edit-profile");
+});
+$("#edit-cancel").addEventListener("click", () => navigateTo("profile"));
+$("#edit-photo").addEventListener("change", async e => {
+  try {
+    const url = await fileToCompressedDataUrl(e.target.files[0]);
+    if (url) { editPhotoDataUrl = url; $("#edit-photo-preview").src = url; }
+  } catch (err) { showToast(err.message, "error"); }
+});
+$("#edit-profile-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = $("#edit-save");
+  setBtnLoading(btn, true);
+  try {
+    const updates = {
+      name: $("#edit-name").value.trim(),
+      nameLower: $("#edit-name").value.trim().toLowerCase(),
+      about: $("#edit-about").value.trim()
+    };
+    if (editPhotoDataUrl) updates.photo = editPhotoDataUrl;
+    await db.ref(`users/${state.uid}`).update(updates);
+    Object.assign(state.profile, updates);
+    updateOwnUIChrome();
+    showToast("Profile updated.", "success");
+    navigateTo("profile");
+  } catch (err) {
+    showToast("Couldn't save your profile. Try again.", "error");
+  } finally {
+    setBtnLoading(btn, false);
+  }
+});
+
+/* =====================================================================
+   12. SETTINGS
+   ===================================================================== */
+function applySettingsToUI(settings) {
+  state.settings = Object.assign(defaultSettings(), settings || {});
+  $("#toggle-online-status").checked = state.settings.showOnlineStatus;
+  $("#toggle-last-seen").checked = state.settings.showLastSeen;
+  $("#toggle-call-permission").checked = state.settings.allowCallsFromAnyone;
+  $("#toggle-notif-incoming").checked = state.settings.notifIncoming;
+  $("#toggle-notif-missed").checked = state.settings.notifMissed;
+}
+
+const settingsMap = {
+  "toggle-online-status": "showOnlineStatus",
+  "toggle-last-seen": "showLastSeen",
+  "toggle-call-permission": "allowCallsFromAnyone",
+  "toggle-notif-incoming": "notifIncoming",
+  "toggle-notif-missed": "notifMissed"
+};
+Object.keys(settingsMap).forEach(id => {
+  $(`#${id}`).addEventListener("change", async e => {
+    const key = settingsMap[id];
+    state.settings[key] = e.target.checked;
+    try { await db.ref(`users/${state.uid}/settings/${key}`).set(e.target.checked); }
+    catch { showToast("Couldn't save that setting.", "error"); }
+  });
+});
+$("#toggle-light-mode").addEventListener("change", e => {
+  state.lightMode = e.target.checked;
+  document.body.classList.toggle("light", state.lightMode);
+});
+
+/* =====================================================================
+   13. NOTIFICATIONS
+   ===================================================================== */
+function attachNotificationsListener(uid) {
+  db.ref(`notifications/${uid}`).limitToLast(30).on("value", snap => {
+    const val = snap.val() || {};
+    state.notifications = Object.entries(val).map(([id, n]) => ({ id, ...n })).sort((a, b) => b.createdAt - a.createdAt);
+    renderNotifications();
+  });
+}
+
+function renderNotifications() {
+  const unread = state.notifications.filter(n => !n.read).length;
+  $("#notif-dot").classList.toggle("hidden", unread === 0);
+  const list = $("#notif-list");
+  if (!state.notifications.length) { list.innerHTML = `<p class="empty-note">You're all caught up.</p>`; return; }
+  list.innerHTML = state.notifications.slice(0, 20).map(n => {
+    const u = state.usersCache[n.fromUid] || {};
+    const label = n.type === "missed" ? `Missed ${n.callType || "voice"} call` : n.type === "declined" ? `Call declined` : "Notification";
+    return `<div class="notif-row" data-uid="${n.fromUid}">
+      <div class="row-avatar" style="width:38px;height:38px;background-image:url('${photoOf(u)}')"></div>
+      <div class="row-body"><div class="rname" style="font-size:13.5px">${escapeHtml(u.name || "Someone")}</div>
+      <div class="rmeta">${label} · ${timeAgo(n.createdAt)}</div></div>
+    </div>`;
+  }).join("");
+  $$(".notif-row", list).forEach(row => row.addEventListener("click", async () => {
+    $("#notif-panel").classList.add("hidden");
+    await cacheUser(row.dataset.uid);
+    openProfile(row.dataset.uid);
+  }));
+}
+
+$("#notif-btn").addEventListener("click", async () => {
+  const panel = $("#notif-panel");
+  panel.classList.toggle("hidden");
+  if (!panel.classList.contains("hidden") && state.notifications.some(n => !n.read)) {
+    const updates = {};
+    state.notifications.forEach(n => { if (!n.read) updates[`notifications/${state.uid}/${n.id}/read`] = true; });
+    db.ref().update(updates);
+  }
+});
+
+async function pushNotification(toUid, payload) {
+  const ref = db.ref(`notifications/${toUid}`).push();
+  await ref.set({ ...payload, read: false, createdAt: firebase.database.ServerValue.TIMESTAMP });
+}
+
+/* =====================================================================
+   14. NEW CALL MODAL
+   ===================================================================== */
+const newCallModal = $("#new-call-modal");
+function openNewCallModal() {
+  renderNewCallList(Object.keys(state.contactsMap));
+  $("#new-call-search").value = "";
+  newCallModal.classList.remove("hidden");
+}
+["new-call-btn", "hero-new-call", "bottom-new-call"].forEach(id => $(`#${id}`).addEventListener("click", openNewCallModal));
+$("#close-new-call").addEventListener("click", () => newCallModal.classList.add("hidden"));
+newCallModal.addEventListener("click", e => { if (e.target === newCallModal) newCallModal.classList.add("hidden"); });
+
+$("#new-call-search").addEventListener("input", debounce(e => {
+  const q = e.target.value.trim().toLowerCase();
+  const uids = Object.keys(state.contactsMap).filter(uid => {
+    const u = state.usersCache[uid];
+    return !q || (u && (u.nameLower?.includes(q) || u.usernameLower?.includes(q)));
+  });
+  renderNewCallList(uids);
+}, 200));
+
+function renderNewCallList(uids) {
+  const list = $("#new-call-list");
+  if (!uids.length) { list.innerHTML = `<p class="empty-note">No contacts to show. Search and add contacts first.</p>`; return; }
+  list.innerHTML = uids.map(uid => contactRowHtml(uid)).join("");
+  $$("[data-call-voice]", list).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); newCallModal.classList.add("hidden"); startCall(b.dataset.callVoice, "voice"); }));
+  $$("[data-call-video]", list).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); newCallModal.classList.add("hidden"); startCall(b.dataset.callVideo, "video"); }));
+  $$(".row-card[data-uid]", list).forEach(row => row.addEventListener("click", e => {
+    if (e.target.closest(".row-icon-btn")) return;
+    newCallModal.classList.add("hidden");
+    openProfile(row.dataset.uid);
+  }));
+}
+
+/* =====================================================================
+   15. CALL HISTORY
+   ===================================================================== */
+function attachCallLogsListener(uid) {
+  db.ref(`callLogs/${uid}`).limitToLast(100).on("value", snap => {
+    const val = snap.val() || {};
+    state.callLogsCache = Object.values(val).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+    const uids = new Set();
+    state.callLogsCache.forEach(c => uids.add(c.peerUid));
+    Promise.all([...uids].map(cacheUser)).then(() => { renderCallHistory(); renderHomeRecent(); });
+    renderCallHistory(); renderHomeRecent();
+  });
+}
+
+let callsFilter = "all";
+$("#calls-filter").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  $$(".chip", $("#calls-filter")).forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  callsFilter = chip.dataset.filter;
+  renderCallHistory();
+});
+
+function filteredLogs(limit) {
+  let logs = state.callLogsCache;
+  if (callsFilter === "missed") logs = logs.filter(c => c.direction === "incoming" && c.status === "missed");
+  else if (callsFilter === "incoming") logs = logs.filter(c => c.direction === "incoming");
+  else if (callsFilter === "outgoing") logs = logs.filter(c => c.direction === "outgoing");
+  else if (callsFilter === "voice") logs = logs.filter(c => c.type === "voice");
+  else if (callsFilter === "video") logs = logs.filter(c => c.type === "video");
+  return limit ? logs.slice(0, limit) : logs;
+}
+
+function callIconSvg(direction, status) {
+  if (status === "missed" || status === "declined") {
+    return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M17 7 7 17M7 7l10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+  }
+  if (direction === "incoming") return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M7 7l10 10M8 17H17V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M17 17 7 7M16 7H7v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function callRowHtml(c) {
+  const u = state.usersCache[c.peerUid] || {};
+  const iconClass = (c.status === "missed" || c.status === "declined") ? "missed" : c.direction;
+  const statusLabel = c.status === "missed" ? "Missed" : c.status === "declined" ? "Declined" : c.direction === "incoming" ? "Incoming" : "Outgoing";
+  const typeLabel = c.type === "video" ? "Video" : "Voice";
+  const durationLabel = c.duration ? ` · ${formatDuration(c.duration)}` : "";
+  return `
+  <div class="row-card" data-uid="${c.peerUid}">
+    <div class="row-avatar-wrap">
+      <div class="row-avatar" style="background-image:url('${photoOf(u)}')"></div>
+    </div>
+    <div class="row-body">
+      <div class="rname">${escapeHtml(u.name || "Unknown")}</div>
+      <div class="rmeta"><span class="call-type-icon ${iconClass}">${callIconSvg(c.direction, c.status)}</span> ${statusLabel} ${typeLabel}${durationLabel} · ${timeAgo(c.startedAt)}</div>
+    </div>
+    <div class="row-actions">
+      <button class="row-icon-btn" data-call-voice="${c.peerUid}" aria-label="Voice call">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M5 4c1 4 2.5 7 5 9.5S15 17 19 18l1-3.4-4-1.4-1.4 1.6a11 11 0 0 1-5.4-5.4L11 7.4 9.6 3.4 6 4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="row-icon-btn" data-call-video="${c.peerUid}" aria-label="Video call">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><rect x="3" y="6.5" width="12" height="11" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 21 7v10l-6-3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderCallHistory() {
+  const list = $("#calls-list");
+  const logs = filteredLogs();
+  if (!logs.length) { list.innerHTML = `<p class="empty-note">Your call history will show up here.</p>`; return; }
+  list.innerHTML = logs.map(callRowHtml).join("");
+  bindCallRowActions(list);
+}
+function renderHomeRecent() {
+  const list = $("#home-recent-list");
+  const logs = filteredLogsForHome();
+  if (!logs.length) { list.innerHTML = `<p class="empty-note">No calls yet — find a contact and say hello.</p>`; return; }
+  list.innerHTML = logs.map(callRowHtml).join("");
+  bindCallRowActions(list);
+}
+function filteredLogsForHome() { return state.callLogsCache.slice(0, 5); }
+
+function bindCallRowActions(root) {
+  $$(".row-card[data-uid]", root).forEach(row => row.addEventListener("click", async e => {
+    if (e.target.closest(".row-icon-btn")) return;
+    await cacheUser(row.dataset.uid);
+    openProfile(row.dataset.uid);
+  }));
+  $$("[data-call-voice]", root).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); startCall(b.dataset.callVoice, "voice"); }));
+  $$("[data-call-video]", root).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); startCall(b.dataset.callVideo, "video"); }));
+}
+
+// Denormalized call-log write, used by both sides at call start/end.
+async function writeCallLog(forUid, direction, callData) {
+  const peerUid = direction === "outgoing" ? callData.receiverId : callData.callerId;
+  await db.ref(`callLogs/${forUid}/${callData.callId}`).set({
+    callId: callData.callId, peerUid, direction,
+    type: callData.type, status: callData.status,
+    startedAt: callData.startedAt || Date.now(),
+    endedAt: callData.endedAt || null,
+    duration: callData.duration || 0
+  });
+}
+
+/* =====================================================================
+   16. WEBRTC CALLING
+   ===================================================================== */
+function newCallSession(overrides) {
+  return Object.assign({
+    callId: null, peerUid: null, type: "voice", role: null, // 'caller' | 'receiver'
+    status: "idle", pc: null, localStream: null, remoteStream: null,
+    startedAt: null, connectedAt: null, timerInterval: null, timeoutHandle: null,
+    reconnectTimer: null, reconnectTimer2: null,
+    micOn: true, camOn: true, speakerOn: true, facingMode: "user"
+  }, overrides);
+}
+
+function attachIncomingCallListener(uid) {
+  db.ref(`incomingCalls/${uid}`).on("child_added", async snap => {
+    const data = snap.val();
+    if (!data || (state.call && state.call.status !== "idle")) {
+      // Already on a call — auto-decline as busy.
+      if (state.call && state.call.status !== "idle" && data) {
+        db.ref(`calls/${data.callId}/status`).set("declined");
+        db.ref(`incomingCalls/${uid}/${data.callId}`).remove();
+      }
+      return;
+    }
+    await cacheUser(data.callerId);
+    state.pendingIncoming = { callId: data.callId, callerId: data.callerId, type: data.type };
+    showIncomingCallUI(data);
+    watchCallStatusForCancellation(data.callId, uid);
+  });
+}
+
+function watchCallStatusForCancellation(callId, myUid) {
+  const ref = db.ref(`calls/${callId}/status`);
+  const handler = snap => {
+    const status = snap.val();
+    if (["ended", "missed", "declined"].includes(status) && state.pendingIncoming && state.pendingIncoming.callId === callId) {
+      hideIncomingCallUI();
+      db.ref(`incomingCalls/${myUid}/${callId}`).remove();
+      state.pendingIncoming = null;
+      ref.off("value", handler);
+    }
+  };
+  ref.on("value", handler);
+}
+
+let ringAudioCtx = null, ringInterval = null;
+function startRingtone() {
+  try {
+    ringAudioCtx = ringAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (ringAudioCtx.state === "suspended") ringAudioCtx.resume();
+    const playRing = () => {
+      if (!ringAudioCtx) return;
+      const t = ringAudioCtx.currentTime;
+      [440, 480].forEach(f => {
+        const o = ringAudioCtx.createOscillator(), g = ringAudioCtx.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.12, t + 0.05);
+        g.gain.setValueAtTime(0.12, t + 0.9);
+        g.gain.linearRampToValueAtTime(0.0001, t + 1.2);
+        o.connect(g).connect(ringAudioCtx.destination);
+        o.start(t); o.stop(t + 1.25);
+      });
+    };
+    playRing();
+    ringInterval = setInterval(playRing, 3000);
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
+  } catch {}
+}
+function stopRingtone() {
+  clearInterval(ringInterval); ringInterval = null;
+  if (navigator.vibrate) navigator.vibrate(0);
+}
+
+function showIncomingCallUI(data) {
+  const caller = state.usersCache[data.callerId] || {};
+  $("#incoming-type-label").textContent = `Incoming ${data.type === "video" ? "Video" : "Voice"} Call`;
+  $("#incoming-photo").src = photoOf(caller);
+  $("#incoming-name").textContent = caller.name || "Unknown";
+  $("#incoming-username").textContent = `@${caller.username || "unknown"}`;
+  $("#incoming-call-screen").classList.remove("hidden");
+  startRingtone();
+}
+function hideIncomingCallUI() { stopRingtone(); $("#incoming-call-screen").classList.add("hidden"); }
+
+// --- Start outgoing call ---
+async function startCall(peerUid, type) {
+  if (!peerUid) return;
+  if (peerUid === state.uid) return;
+  if (state.call && state.call.status !== "idle") { showToast("You're already on a call.", "error"); return; }
+
+  await cacheUser(peerUid);
+  const peer = state.usersCache[peerUid];
+  if (peer && peer.settings && peer.settings.allowCallsFromAnyone === false && !state.contactsMap[peerUid]) {
+    showToast(`${peer.name} isn't accepting calls from non-contacts.`, "error");
+    return;
+  }
+
+  let localStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" ? { facingMode: "user" } : false });
+  } catch (err) {
+    showToast(mediaErrorMessage(err, type), "error");
+    return;
+  }
+
+  const callRef = db.ref("calls").push();
+  const callId = callRef.key;
+  const now = Date.now();
+
+  state.call = newCallSession({ callId, peerUid, type, role: "caller", status: "ringing", localStream, startedAt: now });
+
+  await callRef.set({
+    callId, callerId: state.uid, receiverId: peerUid, type, status: "ringing",
+    startedAt: firebase.database.ServerValue.TIMESTAMP
+  });
+  await db.ref(`incomingCalls/${peerUid}/${callId}`).set({ callId, callerId: state.uid, type, createdAt: firebase.database.ServerValue.TIMESTAMP });
+  writeCallLog(state.uid, "outgoing", { callId, receiverId: peerUid, callerId: state.uid, type, status: "ringing", startedAt: now });
+  setPresenceState(state.uid, "oncall");
+
+  showActiveCallUI(state.call, "calling");
+
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  state.call.pc = pc;
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  attachRemoteStreamHandler(pc);
+
+  pc.onicecandidate = e => { if (e.candidate) db.ref(`signaling/${callId}/callerCandidates`).push(e.candidate.toJSON()); };
+  pc.onconnectionstatechange = () => handleConnectionStateChange(pc.connectionState);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await db.ref(`signaling/${callId}/offer`).set({ sdp: offer.sdp, type: offer.type });
+
+  db.ref(`signaling/${callId}/answer`).on("value", async snap => {
+    const answer = snap.val();
+    if (answer && pc.signalingState !== "stable" && !pc.currentRemoteDescription) {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    }
+  });
+  db.ref(`signaling/${callId}/receiverCandidates`).on("child_added", snap => {
+    if (pc.currentRemoteDescription) pc.addIceCandidate(new RTCIceCandidate(snap.val())).catch(() => {});
+  });
+
+  db.ref(`calls/${callId}/status`).on("value", snap => onCallStatusChange(callId, snap.val()));
+
+  state.call.timeoutHandle = setTimeout(() => {
+    if (state.call && state.call.callId === callId && state.call.status === "ringing") {
+      endCall("missed");
+    }
+  }, CALL_TIMEOUT_MS);
+}
+
+// --- Accept incoming call ---
+async function acceptCall() {
+  const incoming = state.pendingIncoming;
+  if (!incoming) return;
+  hideIncomingCallUI();
+
+  let localStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: incoming.type === "video" ? { facingMode: "user" } : false });
+  } catch (err) {
+    showToast(mediaErrorMessage(err, incoming.type), "error");
+    await db.ref(`calls/${incoming.callId}/status`).set("declined");
+    await db.ref(`incomingCalls/${state.uid}/${incoming.callId}`).remove();
+    state.pendingIncoming = null;
+    return;
+  }
+
+  const now = Date.now();
+  state.call = newCallSession({ callId: incoming.callId, peerUid: incoming.callerId, type: incoming.type, role: "receiver", status: "connecting", localStream, startedAt: now });
+  state.pendingIncoming = null;
+  setPresenceState(state.uid, "oncall");
+  writeCallLog(state.uid, "incoming", { callId: incoming.callId, receiverId: state.uid, callerId: incoming.callerId, type: incoming.type, status: "ongoing", startedAt: now });
+
+  showActiveCallUI(state.call, "connecting");
+
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  state.call.pc = pc;
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  attachRemoteStreamHandler(pc);
+  pc.onicecandidate = e => { if (e.candidate) db.ref(`signaling/${incoming.callId}/receiverCandidates`).push(e.candidate.toJSON()); };
+  pc.onconnectionstatechange = () => handleConnectionStateChange(pc.connectionState);
+
+  const offerSnap = await db.ref(`signaling/${incoming.callId}/offer`).get();
+  await pc.setRemoteDescription(new RTCSessionDescription(offerSnap.val()));
+
+  db.ref(`signaling/${incoming.callId}/callerCandidates`).on("child_added", snap => {
+    if (pc.currentRemoteDescription) pc.addIceCandidate(new RTCIceCandidate(snap.val())).catch(() => {});
+  });
+
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await db.ref(`signaling/${incoming.callId}/answer`).set({ sdp: answer.sdp, type: answer.type });
+
+  await db.ref(`calls/${incoming.callId}/status`).set("accepted");
+  await db.ref(`incomingCalls/${state.uid}/${incoming.callId}`).remove();
+
+  db.ref(`calls/${incoming.callId}/status`).on("value", snap => onCallStatusChange(incoming.callId, snap.val()));
+}
+
+function declineCall() {
+  const incoming = state.pendingIncoming;
+  if (!incoming) return;
+  hideIncomingCallUI();
+  db.ref(`calls/${incoming.callId}/status`).set("declined");
+  db.ref(`calls/${incoming.callId}/endedAt`).set(firebase.database.ServerValue.TIMESTAMP);
+  db.ref(`incomingCalls/${state.uid}/${incoming.callId}`).remove();
+  pushNotification(incoming.callerId, { type: "declined", fromUid: state.uid, callId: incoming.callId, callType: incoming.type });
+  writeCallLog(state.uid, "incoming", { callId: incoming.callId, receiverId: state.uid, callerId: incoming.callerId, type: incoming.type, status: "declined", startedAt: Date.now(), endedAt: Date.now() });
+  state.pendingIncoming = null;
+}
+
+$("#accept-call-btn").addEventListener("click", acceptCall);
+$("#decline-call-btn").addEventListener("click", declineCall);
+
+function attachRemoteStreamHandler(pc) {
+  const remoteStream = new MediaStream();
+  state.call.remoteStream = remoteStream;
+  pc.ontrack = e => { remoteStream.addTrack(e.track); $("#remote-video").srcObject = remoteStream; };
+}
+
+function clearReconnectTimers() {
+  if (!state.call) return;
+  clearTimeout(state.call.reconnectTimer);
+  clearTimeout(state.call.reconnectTimer2);
+  state.call.reconnectTimer = state.call.reconnectTimer2 = null;
+}
+
+function handleConnectionStateChange(cs) {
+  if (!state.call) return;
+  if (cs === "connected") clearReconnectTimers();
+  if (cs === "connected" && state.call.status !== "ongoing") {
+    state.call.status = "ongoing";
+    state.call.connectedAt = Date.now();
+    $("#call-status-pill").textContent = "Connected";
+    $("#call-status-text").textContent = "Connected";
+    $("#call-timer").classList.remove("hidden");
+    startCallTimer();
+    clearTimeout(state.call.timeoutHandle);
+  } else if (cs === "disconnected" && state.call.status === "ongoing") {
+    // Brief network blip: ride it out, force an ICE restart, only give up
+    // after a real grace period.
+    state.call.reconnectTimer = setTimeout(() => {
+      if (state.call && state.call.pc && ["disconnected", "failed"].includes(state.call.pc.connectionState)) {
+        try { state.call.pc.restartIce(); } catch {}
+        state.call.reconnectTimer2 = setTimeout(() => {
+          if (state.call && state.call.pc && ["disconnected", "failed", "closed"].includes(state.call.pc.connectionState)) {
+            showToast("Connection lost.", "error");
+            endCall("ended");
+          }
+        }, 6000);
+      }
+    }, 4000);
+  } else if (["failed", "closed"].includes(cs) && state.call.status === "ongoing") {
+    if (state.call.pc) { try { state.call.pc.restartIce(); } catch {} }
+    state.call.reconnectTimer = setTimeout(() => {
+      if (state.call && state.call.pc && ["failed", "closed"].includes(state.call.pc.connectionState)) {
+        showToast("Connection lost.", "error");
+        endCall("ended");
+      }
+    }, 5000);
+  } else if (cs === "failed" && state.call.status !== "ongoing") {
+    showToast("Couldn't establish the call connection.", "error");
+    endCall("ended");
+  }
+}
+
+function onCallStatusChange(callId, status) {
+  if (!state.call || state.call.callId !== callId) return;
+  if (status === "accepted" && state.call.role === "caller") {
+    state.call.status = "connecting";
+    $("#call-status-pill").textContent = "Connecting…";
+    $("#call-status-text").textContent = "Connecting…";
+    clearTimeout(state.call.timeoutHandle);
+  }
+  if (status === "declined" && state.call.status !== "ongoing") {
+    showToast(`${state.usersCache[state.call.peerUid]?.name || "They"} declined the call.`, "info");
+    cleanupCallSession("declined");
+  }
+  if (status === "ended" && state.call.status !== "idle") {
+    cleanupCallSession("ended");
+  }
+}
+
+function mediaErrorMessage(err, type) {
+  if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+    return type === "video" ? "Camera/microphone permission was denied." : "Microphone permission was denied.";
+  }
+  if (err.name === "NotFoundError") return `No ${type === "video" ? "camera or microphone" : "microphone"} was found.`;
+  if (err.name === "NotReadableError") return "Your camera or microphone is already in use by another app.";
+  return "Couldn't access your camera/microphone.";
+}
+
+/* ---------------------------------------------------------------------
+   Active call UI
+   --------------------------------------------------------------------- */
+function showActiveCallUI(call, phase) {
+  const peer = state.usersCache[call.peerUid] || {};
+  $("#active-call-screen").classList.remove("hidden");
+  $("#call-timer").classList.add("hidden");
+  $("#call-timer").textContent = "00:00";
+
+  if (call.type === "video") {
+    $("#video-layer").classList.remove("hidden");
+    $("#voice-layer").classList.add("hidden");
+    $("#local-video").srcObject = call.localStream;
+    $("#remote-video").srcObject = call.remoteStream || null;
+    $("#toggle-cam-btn").classList.remove("hidden");
+    $("#switch-cam-btn").classList.remove("hidden");
+  } else {
+    $("#video-layer").classList.add("hidden");
+    $("#voice-layer").classList.remove("hidden");
+    $("#active-photo").src = photoOf(peer);
+    $("#active-name").textContent = peer.name || "Unknown";
+    $("#toggle-cam-btn").classList.add("hidden");
+    $("#switch-cam-btn").classList.add("hidden");
+  }
+  $("#call-status-pill").textContent = phase === "calling" ? "Calling…" : phase === "connecting" ? "Connecting…" : "Connected";
+  $("#call-status-text").textContent = $("#call-status-pill").textContent;
+
+  $("#toggle-mic-btn").classList.remove("active-state");
+  $("#toggle-speaker-btn").classList.toggle("active-state", call.speakerOn);
+}
+
+function startCallTimer() {
+  clearInterval(state.call.timerInterval);
+  const started = state.call.connectedAt;
+  state.call.timerInterval = setInterval(() => {
+    if (!state.call) return;
+    const sec = Math.floor((Date.now() - started) / 1000);
+    $("#call-timer").textContent = formatDuration(sec);
+  }, 1000);
+}
+
+$("#toggle-mic-btn").addEventListener("click", () => {
+  if (!state.call?.localStream) return;
+  state.call.micOn = !state.call.micOn;
+  state.call.localStream.getAudioTracks().forEach(t => t.enabled = state.call.micOn);
+  $("#toggle-mic-btn").classList.toggle("active-state", !state.call.micOn);
+});
+$("#toggle-cam-btn").addEventListener("click", () => {
+  if (!state.call?.localStream) return;
+  state.call.camOn = !state.call.camOn;
+  state.call.localStream.getVideoTracks().forEach(t => t.enabled = state.call.camOn);
+  $("#toggle-cam-btn").classList.toggle("active-state", !state.call.camOn);
+});
+$("#toggle-speaker-btn").addEventListener("click", async () => {
+  state.call.speakerOn = !state.call.speakerOn;
+  $("#toggle-speaker-btn").classList.toggle("active-state", state.call.speakerOn);
+  const remoteVideo = $("#remote-video");
+  try {
+    if (typeof remoteVideo.setSinkId === "function") {
+      // Best-effort speaker/earpiece switch where the browser exposes output device selection.
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const speaker = devices.find(d => d.kind === "audiooutput" && /speaker/i.test(d.label));
+      if (speaker) await remoteVideo.setSinkId(speaker.deviceId);
+    }
+  } catch { /* setSinkId unsupported — control remains a local UI toggle */ }
+});
+$("#switch-cam-btn").addEventListener("click", async () => {
+  if (!state.call || state.call.type !== "video") return;
+  state.call.facingMode = state.call.facingMode === "user" ? "environment" : "user";
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: state.call.facingMode } });
+    const newVideoTrack = newStream.getVideoTracks()[0];
+    const sender = state.call.pc.getSenders().find(s => s.track && s.track.kind === "video");
+    if (sender) await sender.replaceTrack(newVideoTrack);
+    const oldTrack = state.call.localStream.getVideoTracks()[0];
+    if (oldTrack) { state.call.localStream.removeTrack(oldTrack); oldTrack.stop(); }
+    state.call.localStream.addTrack(newVideoTrack);
+    $("#local-video").srcObject = state.call.localStream;
+  } catch {
+    showToast("Couldn't switch camera on this device.", "error");
+  }
+});
+$("#end-call-btn").addEventListener("click", () => endCall("ended"));
+
+async function endCall(finalStatus) {
+  if (!state.call) return;
+  const call = state.call;
+  const duration = call.connectedAt ? Math.floor((Date.now() - call.connectedAt) / 1000) : 0;
+
+  await db.ref(`calls/${call.callId}`).update({
+    status: finalStatus, endedAt: firebase.database.ServerValue.TIMESTAMP, duration
+  });
+  if (call.role === "caller") {
+    await db.ref(`incomingCalls/${call.peerUid}/${call.callId}`).remove();
+    if (finalStatus === "missed") {
+      await pushNotification(call.peerUid, { type: "missed", fromUid: state.uid, callId: call.callId, callType: call.type }).catch(() => {});
+    }
+  }
+  const logStatus = finalStatus === "missed" ? "missed" : "ended";
+  writeCallLog(state.uid, call.role === "caller" ? "outgoing" : "incoming", {
+    callId: call.callId, callerId: call.role === "caller" ? state.uid : call.peerUid,
+    receiverId: call.role === "caller" ? call.peerUid : state.uid,
+    type: call.type, status: logStatus, startedAt: call.startedAt, endedAt: Date.now(), duration
+  });
+  writeCallLog(call.peerUid, call.role === "caller" ? "incoming" : "outgoing", {
+    callId: call.callId, callerId: call.role === "caller" ? state.uid : call.peerUid,
+    receiverId: call.role === "caller" ? call.peerUid : state.uid,
+    type: call.type, status: logStatus, startedAt: call.startedAt, endedAt: Date.now(), duration
+  }).catch(() => {});
+
+  cleanupCallSession(finalStatus);
+}
+
+function cleanupCallSession(reason) {
+  const call = state.call;
+  if (!call) return;
+  clearTimeout(call.timeoutHandle);
+  clearInterval(call.timerInterval);
+  clearTimeout(call.reconnectTimer);
+  clearTimeout(call.reconnectTimer2);
+  try { call.pc && call.pc.close(); } catch {}
+  try { call.localStream && call.localStream.getTracks().forEach(t => t.stop()); } catch {}
+  db.ref(`signaling/${call.callId}/answer`).off();
+  db.ref(`signaling/${call.callId}/callerCandidates`).off();
+  db.ref(`signaling/${call.callId}/receiverCandidates`).off();
+  db.ref(`calls/${call.callId}/status`).off();
+
+  $("#active-call-screen").classList.add("hidden");
+  $("#local-video").srcObject = null;
+  $("#remote-video").srcObject = null;
+
+  state.call = null;
+  setPresenceState(state.uid, "online");
+  if (reason === "declined") showToast("Call declined.", "info");
+  if (reason === "missed") showToast("No answer.", "info");
+}
+
+/* =====================================================================
+   17. PWA — install prompt + service worker registration
+   ===================================================================== */
+let deferredInstallPrompt = null;
+const isStandalone = () =>
+  window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+function refreshInstallUI() {
+  const installed = isStandalone();
+  $("#installed-app-group").classList.toggle("hidden", !installed);
+  $("#install-app-group").classList.toggle("hidden", installed || !deferredInstallPrompt);
+}
+
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  refreshInstallUI();
+});
+
+$("#install-app-btn").addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  if (outcome === "accepted") showToast("Wavelength is being installed.", "success");
+  deferredInstallPrompt = null;
+  refreshInstallUI();
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  refreshInstallUI();
+  showToast("Wavelength installed.", "success");
+});
+
+refreshInstallUI();
+
+// PWA: register the service worker from a real file so the app is
+// installable and gets a proper offline shell cache.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(err => {
+      console.warn("Service worker registration failed:", err);
+    });
+  });
+}
+
+/* =====================================================================
+   18. GLOBAL / NETWORK ERROR HANDLING
+   ===================================================================== */
+db.ref(".info/connected").on("value", snap => {
+  const dot = $("#net-dot");
+  if (dot) dot.classList.toggle("online", snap.val() === true);
+  if (snap.val() === false) showToast("You're offline. Some features may be unavailable.", "error");
+});
+window.addEventListener("offline", () => showToast("No internet connection.", "error"));
+window.addEventListener("online", () => showToast("Back online.", "success"));
+window.addEventListener("error", e => { console.error(e.error || e.message); });
+window.addEventListener("unhandledrejection", e => { console.error(e.reason); });
+
+</script>
+</body>
+</html>
